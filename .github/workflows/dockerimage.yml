@@ -1,0 +1,39 @@
+name: Docker Image CI
+
+on: push
+# on: 
+#   push:
+#     branches: [ master ]
+#   pull_request:
+#     branches: [ master ]
+
+env:
+  # Enable BuildKit
+  DOCKER_BUILDKIT: 1
+  IMAGE_NAME: console-application
+  IMAGE_TAG: 0.1
+
+jobs:
+  build:
+    name: Build image
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v2
+      
+    - name: Login GitHub Registry
+      run: docker login docker.pkg.github.com -u owner -p ${{ secrets.GITHUB_TOKEN }}
+      
+    - name: Build the Docker image
+      run: docker build -t docker.pkg.github.com/${{ github.repository }}/${IMAGE_NAME}:${IMAGE_TAG} --file Dockerfile .
+
+    - name: Push image to GitHub Registry
+      run: docker push docker.pkg.github.com/${{ github.repository }}/${IMAGE_NAME}:${IMAGE_TAG}
+
+#     - name: Notify Result to Slack
+#       uses: homoluctus/slatify@master
+#       if: always()
+#       with:
+#         type: ${{ job.status }}
+#         job_name: ':docker: *Build image*'
+#         channel: '#general'
+#         url: ${{ secrets.SLACK_WEBHOOK }}
