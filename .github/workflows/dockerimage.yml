@@ -29,7 +29,7 @@ jobs:
     - name: Push image to GitHub Registry
       run: docker push docker.pkg.github.com/${{ github.repository }}/${IMAGE_NAME}:${IMAGE_TAG}
 
-    - shell: bash
+    - name: Hello world action
       env:
         SLACK_WEBHOOK: ${{ secrets.SLACK_WEBHOOK }}
 
