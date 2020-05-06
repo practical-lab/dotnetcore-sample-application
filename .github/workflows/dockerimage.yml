@@ -29,6 +29,11 @@ jobs:
     - name: Push image to GitHub Registry
       run: docker push docker.pkg.github.com/${{ github.repository }}/${IMAGE_NAME}:${IMAGE_TAG}
 
+    - name: Get Secrets
+      shell: bash
+      env:
+        SLACK_WEBHOOK: ${{ secrets.SLACK_WEBHOOK }}
+
     - name: Notify Result to Slack
       uses: rtCamp/action-slack-notify@v2.0.0
       if: always()
@@ -38,4 +43,4 @@ jobs:
         SLACK_MESSAGE: ${{ job.status }}
         SLACK_TITLE: ${{ github.ref }}
         SLACK_USERNAME: Github Actions
-        SLACK_WEBHOOK: ${{ secrets.SLACK_WEBHOOK }}
+        SLACK_WEBHOOK: $SLACK_WEBHOOK
