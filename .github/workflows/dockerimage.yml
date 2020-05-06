@@ -18,26 +18,148 @@ jobs:
     name: Build image
     runs-on: ubuntu-latest
     steps:
-    - uses: actions/checkout@v2
-      
-    - name: Login GitHub Registry
-      run: docker login docker.pkg.github.com -u owner -p ${{ secrets.GITHUB_TOKEN }}
-      
-    - name: Build the Docker image
-      run: docker build -t docker.pkg.github.com/${{ github.repository }}/${IMAGE_NAME}:${IMAGE_TAG} --file Dockerfile .
+      - uses: actions/checkout@v2
+        
+      - name: Login GitHub Registry
+        run: docker login docker.pkg.github.com -u owner -p ${{ secrets.GITHUB_TOKEN }}
+        
+      - name: Build the Docker image
+        run: docker build -t docker.pkg.github.com/${{ github.repository }}/${IMAGE_NAME}:${IMAGE_TAG} --file Dockerfile .
 
-    - name: Push image to GitHub Registry
-      run: docker push docker.pkg.github.com/${{ github.repository }}/${IMAGE_NAME}:${IMAGE_TAG}
+      - name: Push image to GitHub Registry
+        run: docker push docker.pkg.github.com/${{ github.repository }}/${IMAGE_NAME}:${IMAGE_TAG}
 
-    - name: Notify Result to Slack
-      env:
-        SLACK_WEBHOOK: ${{ secrets.SLACK_WEBHOOK }}
-      uses: rtCamp/action-slack-notify@v2.0.0
-      if: always()
-      with:
-        SLACK_CHANNEL: dotnet-sample-application
-        SLACK_COLOR: '#3278BD'
-        SLACK_MESSAGE: ${{ job.status }}
-        SLACK_TITLE: ${{ github.ref }}
-        SLACK_USERNAME: Github Actions
-        SLACK_WEBHOOK: ${SLACK_WEBHOOK}
+      - name: Notify Result to Slack
+        env:
+          SLACK_WEBHOOK: ${{ secrets.SLACK_WEBHOOK }}
+        uses: rtCamp/action-slack-notify@v2.0.0
+        if: always()
+        with:
+          SLACK_CHANNEL: dotnet-sample-application
+          SLACK_COLOR: '#3278BD'
+          SLACK_MESSAGE: ${{ job.status }}
+          SLACK_TITLE: ${{ github.ref }}
+          SLACK_USERNAME: 'Github Actions'
+          SLACK_WEBHOOK: ${SLACK_WEBHOOK}
+
+  trivy:
+    name: Trivy Scan Vulnerability
+    runs-on: ubuntu-18.04
+    needs: build
+    steps:
+      - uses: actions/checkout@master
+
+      - name: Login GitHub Registry
+        run: docker login docker.pkg.github.com -u owner -p ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Pull image from GitHub Registry
+        run: docker pull docker.pkg.github.com/${{ github.repository }}/${IMAGE_NAME}:${IMAGE_TAG}
+
+      - name: Install trivy
+        run: |
+          sudo apt-get install --no-install-recommends apt-transport-https gnupg
+          wget -qO - https://aquasecurity.github.io/trivy-repo/deb/public.key | sudo apt-key add -
+          echo deb https://aquasecurity.github.io/trivy-repo/deb $(lsb_release -cs) main | sudo tee -a /etc/apt/sources.list.d/trivy.list
+          sudo apt-get update
+          sudo apt-get install --no-install-recommends trivy
+
+      - name: Vulnerability Scan with Trivy
+        run: |
+          trivy -q --severity HIGH,CRITICAL \
+            --exit-code 1 docker.pkg.github.com/${{ github.repository }}/${IMAGE_NAME}:${IMAGE_TAG}
+
+      - name: Notify Result to Slack
+        env:
+          SLACK_WEBHOOK: ${{ secrets.SLACK_WEBHOOK }}
+        uses: rtCamp/action-slack-notify@v2.0.0
+        if: always()
+        with:
+          SLACK_CHANNEL: dotnet-sample-application
+          SLACK_COLOR: '#3278BD'
+          SLACK_MESSAGE: ${{ job.status }}
+          SLACK_TITLE: ${{ github.ref }}
+          SLACK_USERNAME: 'Github Actions'
+          SLACK_WEBHOOK: ${SLACK_WEBHOOK}
+
+  dockle:
+    name: Dockle
+    runs-on: ubuntu-18.04
+    needs: build
+    steps:
+      - uses: actions/checkout@master
+
+      - name: Login GitHub Registry
+        run: docker login docker.pkg.github.com -u owner -p ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Pull image from GitHub Registry
+        run: docker pull docker.pkg.github.com/${{ github.repository }}/${IMAGE_NAME}:${IMAGE_TAG}
+
+      - name: Install dockle
+        run: |
+          VERSION=$(curl --silent "https://api.github.com/repos/goodwithtech/dockle/releases/latest" | \
+          grep '"tag_name":' | \
+          sed -E 's/.*"v([^"]+)".*/\1/' \
+          )
+          curl -L -o dockle.deb https://github.com/goodwithtech/dockle/releases/download/v${VERSION}/dockle_${VERSION}_Linux-64bit.deb
+          sudo dpkg -i dockle.deb
+          rm dockle.deb
+
+      - name: Check image with dockle
+        run: dockle docker.pkg.github.com/${{ github.repository }}/${IMAGE_NAME}:${IMAGE_TAG}
+
+      - name: Notify Result to Slack
+        env:
+          SLACK_WEBHOOK: ${{ secrets.SLACK_WEBHOOK }}
+        uses: rtCamp/action-slack-notify@v2.0.0
+        if: always()
+        with:
+          SLACK_CHANNEL: dotnet-sample-application
+          SLACK_COLOR: '#3278BD'
+          SLACK_MESSAGE: ${{ job.status }}
+          SLACK_TITLE: ${{ github.ref }}
+          SLACK_USERNAME: 'Github Actions'
+          SLACK_WEBHOOK: ${SLACK_WEBHOOK}
+
+  # push:
+  #   name: Push Docker Image to ECR
+  #   runs-on: ubuntu-18.04
+  #   needs: [trivy, dockle]
+  #   steps:
+  #     - uses: actions/checkout@master
+
+  #     - uses: actions/setup-go@master
+  #       with:
+  #         go-version: '1.13'
+
+  #     - name: Install ecs-cli
+  #       run: go get github.com/aws/amazon-ecs-cli/ecs-cli
+
+  #     - name: Login GitHub Registry
+  #       run: docker login docker.pkg.github.com -u owner -p ${{ secrets.GITHUB_TOKEN }}
+
+  #     - name: Pull image from GitHub Registry
+  #       run: |
+  #         docker pull docker.pkg.github.com/${{ github.repository }}/${IMAGE_NAME}:${IMAGE_TAG}
+  #        # Change docker image name
+  #         docker tag docker.pkg.github.com/${{ github.repository }}/${IMAGE_NAME}:${IMAGE_TAG} ${IMAGE_NAME}:${IMAGE_TAG}
+
+  #     - name: Push image to ECR
+  #       env:
+  #         AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
+  #         AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+  #         AWS_DEFAULT_REGION: ap-northeast-1
+  #       # GOPATH bug [reference](https://github.com/actions/setup-go/issues/14)
+  #       run: $(go env GOPATH)/bin/ecs-cli push ${IMAGE_NAME}:${IMAGE_TAG}
+
+  #     - name: Notify Result to Slack
+  #       env:
+  #         SLACK_WEBHOOK: ${{ secrets.SLACK_WEBHOOK }}
+  #       uses: rtCamp/action-slack-notify@v2.0.0
+  #       if: always()
+  #       with:
+  #         SLACK_CHANNEL: dotnet-sample-application
+  #         SLACK_COLOR: '#3278BD'
+  #         SLACK_MESSAGE: ${{ job.status }}
+  #         SLACK_TITLE: ${{ github.ref }}
+  #         SLACK_USERNAME: 'Github Actions'
+  #         SLACK_WEBHOOK: ${SLACK_WEBHOOK}
