@@ -42,44 +42,44 @@ jobs:
           SLACK_USERNAME: 'Github Actions'
           SLACK_WEBHOOK: ${SLACK_WEBHOOK}
 
-  trivy:
-    name: Trivy Scan Vulnerability
-    runs-on: ubuntu-18.04
-    needs: build
-    steps:
-      - uses: actions/checkout@master
+  # trivy:
+  #   name: Trivy Scan Vulnerability
+  #   runs-on: ubuntu-18.04
+  #   needs: build
+  #   steps:
+  #     - uses: actions/checkout@master
 
-      - name: Login GitHub Registry
-        run: docker login docker.pkg.github.com -u owner -p ${{ secrets.GITHUB_TOKEN }}
+  #     - name: Login GitHub Registry
+  #       run: docker login docker.pkg.github.com -u owner -p ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Pull image from GitHub Registry
-        run: docker pull docker.pkg.github.com/${{ github.repository }}/${IMAGE_NAME}:${IMAGE_TAG}
+  #     - name: Pull image from GitHub Registry
+  #       run: docker pull docker.pkg.github.com/${{ github.repository }}/${IMAGE_NAME}:${IMAGE_TAG}
 
-      - name: Install trivy
-        run: |
-          sudo apt-get install --no-install-recommends apt-transport-https gnupg
-          wget -qO - https://aquasecurity.github.io/trivy-repo/deb/public.key | sudo apt-key add -
-          echo deb https://aquasecurity.github.io/trivy-repo/deb $(lsb_release -cs) main | sudo tee -a /etc/apt/sources.list.d/trivy.list
-          sudo apt-get update
-          sudo apt-get install --no-install-recommends trivy
+  #     - name: Install trivy
+  #       run: |
+  #         sudo apt-get install --no-install-recommends apt-transport-https gnupg
+  #         wget -qO - https://aquasecurity.github.io/trivy-repo/deb/public.key | sudo apt-key add -
+  #         echo deb https://aquasecurity.github.io/trivy-repo/deb $(lsb_release -cs) main | sudo tee -a /etc/apt/sources.list.d/trivy.list
+  #         sudo apt-get update
+  #         sudo apt-get install --no-install-recommends trivy
 
-      - name: Vulnerability Scan with Trivy
-        run: |
-          trivy -q --severity HIGH,CRITICAL \
-            --exit-code 1 docker.pkg.github.com/${{ github.repository }}/${IMAGE_NAME}:${IMAGE_TAG}
+  #     - name: Vulnerability Scan with Trivy
+  #       run: |
+  #         trivy -q --severity HIGH,CRITICAL \
+  #           --exit-code 1 docker.pkg.github.com/${{ github.repository }}/${IMAGE_NAME}:${IMAGE_TAG}
 
-      - name: Notify Result to Slack
-        env:
-          SLACK_WEBHOOK: ${{ secrets.SLACK_WEBHOOK }}
-        uses: rtCamp/action-slack-notify@v2.0.0
-        if: always()
-        with:
-          SLACK_CHANNEL: dotnet-sample-application
-          SLACK_COLOR: '#3278BD'
-          SLACK_MESSAGE: ${{ job.status }}
-          SLACK_TITLE: ${{ github.ref }}
-          SLACK_USERNAME: 'Github Actions'
-          SLACK_WEBHOOK: ${SLACK_WEBHOOK}
+  #     - name: Notify Result to Slack
+  #       env:
+  #         SLACK_WEBHOOK: ${{ secrets.SLACK_WEBHOOK }}
+  #       uses: rtCamp/action-slack-notify@v2.0.0
+  #       if: always()
+  #       with:
+  #         SLACK_CHANNEL: dotnet-sample-application
+  #         SLACK_COLOR: '#3278BD'
+  #         SLACK_MESSAGE: ${{ job.status }}
+  #         SLACK_TITLE: ${{ github.ref }}
+  #         SLACK_USERNAME: 'Github Actions'
+  #         SLACK_WEBHOOK: ${SLACK_WEBHOOK}
 
   dockle:
     name: Dockle

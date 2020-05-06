@@ -1,5 +1,7 @@
 # dotnetcore-sample-application
 
+![Docker Image CI](https://github.com/practical-lab/dotnetcore-sample-application/workflows/Docker%20Image%20CI/badge.svg)
+
 This is an example console application using dotnetcore.
 
 ## Development
